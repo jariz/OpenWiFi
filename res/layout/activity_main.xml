@@ -7,10 +7,19 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".MainActivity" >
-
-    <TextView
+    <de.passsy.holocircularprogressbar.HoloCircularProgressBar
+        android:id="@+id/holoCircularProgressBar1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/hello_world" />
+        style="@style/OpenWiFi.Circular.Blue"/>
 
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="OpenWiFi is disabled"
+        android:id="@+id/textView"
+        android:gravity="center_vertical|center_horizontal"
+        android:fontFamily="sans-serif-condensed"
+        android:padding="100dp"/>
 </RelativeLayout>
