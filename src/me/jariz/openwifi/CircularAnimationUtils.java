@@ -3,6 +3,7 @@ package me.jariz.openwifi;
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.util.Log;
 import de.passsy.holocircularprogressbar.HoloCircularProgressBar;
 
 /**
@@ -14,10 +15,15 @@ import de.passsy.holocircularprogressbar.HoloCircularProgressBar;
  */
 public class CircularAnimationUtils {
 
-    String TAG = "OpenWiFi_CircularAnimationUtils";
+    static String TAG = "OW_ANIMATION";
+    static ObjectAnimator progressBarAnimator;
 
     public static void fillProgressbar(final long duration, final HoloCircularProgressBar holo) {
-        final ObjectAnimator progressBarAnimator = ObjectAnimator.ofFloat(holo, "progress", 1f);
+        if (progressBarAnimator != null) {
+            progressBarAnimator.end();
+
+        }
+        progressBarAnimator = ObjectAnimator.ofFloat(holo, "progress", 1f);
         progressBarAnimator.addListener(new Animator.AnimatorListener() {
 
             @Override
@@ -51,14 +57,16 @@ public class CircularAnimationUtils {
     }
 
     static boolean pulseDirection = true;
-    static int pulseTimes;
-    //overrides pulseTimes
     static boolean pulseKeep = false;
+    static boolean pulseRunning = false;
 
-    public static void pulse(final int times, final HoloCircularProgressBar holo, final long duration) {
-        CircularAnimationUtils.pulseTimes = times;
-
-        pulseInternal(holo, true, new Animator.AnimatorListener() {
+    public static void pulse(final HoloCircularProgressBar holo, final long duration) {
+        if(pulseRunning) {
+            Log.i(TAG, "Tried to start a pulse while there already is one running");
+            return;
+        }
+        pulseRunning = true;
+        pulseInternal(holo, pulseDirection, new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animator) {
                 newPulse(holo,duration);
@@ -71,7 +79,7 @@ public class CircularAnimationUtils {
 
             @Override
             public void onAnimationCancel(Animator animator) {
-
+                holo.setAlpha(pulseDirection ? 1f : 0f);
             }
 
             @Override
@@ -82,7 +90,7 @@ public class CircularAnimationUtils {
     }
 
     static void newPulse(final HoloCircularProgressBar holo, final long duration) {
-        if(CircularAnimationUtils.pulseKeep && CircularAnimationUtils.pulseDirection || CircularAnimationUtils.pulseTimes != 0) {
+        if(CircularAnimationUtils.pulseKeep) {
             pulseInternal(holo, CircularAnimationUtils.pulseDirection, new Animator.AnimatorListener() {
                 @Override
                 public void onAnimationStart(Animator animator) {
@@ -96,7 +104,7 @@ public class CircularAnimationUtils {
 
                 @Override
                 public void onAnimationCancel(Animator animator) {
-
+                    holo.setAlpha(pulseDirection ? 1f : 0f);
                 }
 
                 @Override
@@ -104,22 +112,33 @@ public class CircularAnimationUtils {
 
                 }
             }, duration);
-            CircularAnimationUtils.pulseDirection = !CircularAnimationUtils.pulseDirection;
-            if(!CircularAnimationUtils.pulseKeep) CircularAnimationUtils.pulseTimes--;
+            pulseDirection = !pulseDirection;
+        } else {
+            
+            pulseRunning = false;
         }
     }
 
+    static ObjectAnimator pulseAnimator;
     private static void pulseInternal(final HoloCircularProgressBar holo, final boolean direction, final Animator.AnimatorListener listener, final long duration) {
-        final ObjectAnimator progressBarAnimator = ObjectAnimator.ofFloat(holo, "alpha", direction ? 1f : 0f);
-        progressBarAnimator.addListener(new Animator.AnimatorListener() {
+        if(pulseAnimator != null) {
+            pulseAnimator.cancel();
+        }
+        pulseAnimator = ObjectAnimator.ofFloat(holo, "alpha", direction ? 1f : 0f);
+        pulseAnimator.addListener(new Animator.AnimatorListener() {
 
             @Override
             public void onAnimationCancel(final Animator animation) {
+                holo.setAlpha(direction ? 1f : 0f);
             }
 
             @Override
             public void onAnimationEnd(final Animator animation) {
-                holo.setAlpha(direction ? 1f : 0f);
+                if(!pulseKeep) {
+                    holo.setAlpha(1f);
+                    pulseDirection = true;
+                } else
+                    holo.setAlpha(direction ? 1f : 0f);
             }
 
             @Override
@@ -131,16 +150,20 @@ public class CircularAnimationUtils {
             }
         });
 
-        progressBarAnimator.addListener(listener);
-        progressBarAnimator.setDuration(duration);
-        progressBarAnimator.reverse();
-        progressBarAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+        pulseAnimator.addListener(listener);
+        pulseAnimator.setDuration(duration);
+        pulseAnimator.reverse();
+
+        pulseAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
 
             @Override
             public void onAnimationUpdate(final ValueAnimator animation) {
-                holo.setAlpha((Float) animation.getAnimatedValue());
+                if(pulseKeep)
+                    holo.setAlpha((Float) animation.getAnimatedValue());
+                else //'reverse' the animation
+                    holo.setAlpha(1f - (Float) animation.getAnimatedValue() );
             }
         });
-        progressBarAnimator.start();
+        pulseAnimator.start();
     }
 }
