@@ -1,20 +1,39 @@
 <resources>
 
+    <style name="OpenWiFi.Light.Dark" parent="android:Theme.Holo.Light.DarkActionBar">
+        <item name="circularProgressBarStyle">@style/OpenWiFi.Circular.Light</item>
+    </style>
+
+    <style name="OpenWiFi.Wallpaper" parent="android:Theme.Holo.Wallpaper">
+        <item name="circularProgressBarStyle">@style/OpenWiFi.Circular</item>
+        <item name="android:windowBackground">@drawable/openwifi_wallpaper_gradient</item>
+
+    </style>
+
+    <style name="OpenWiFi.Light" parent="android:Theme.Holo.Light.DarkActionBar">
+        <item name="circularProgressBarStyle">@style/OpenWiFi.Circular.Light</item>
+    </style>
+
     <style name="OpenWiFi" parent="android:Theme.Holo">
-        <item name="circularProgressBarStyle">@style/CircularProgressBar</item>
-
+        <item name="circularProgressBarStyle">@style/OpenWiFi.Circular</item>
     </style>
 
-    <style name="OpenWiFi.Circular" parent="CircularProgressBar">
+    <style name="OpenWiFi.Circular.Light">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="stroke_width">5dp</item>
         <item name="progress" format="float">1</item>
+        <item name="progress_color">@android:color/darker_gray</item>
+        <item name="progress_background_color">@android:color/darker_gray</item>
     </style>
 
-    <style name="OpenWiFi.Circular.Green" parent="OpenWiFi.Circular">
-        <item name="progress_color">@android:color/holo_green_light</item>
-    </style>
-
-    <style name="OpenWiFi.Circular.Blue" parent="OpenWiFi.Circular">
-        <item name="progress_color">@android:color/holo_blue_bright</item>
+    <style name="OpenWiFi.Circular">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="stroke_width">5dp</item>
+        <item name="progress" format="float">1</item>
+        <item name="progress_color">@android:color/darker_gray</item>
+        <item name="progress_background_color">@android:color/background_light</item>
     </style>
 
     <style name="AppTheme" parent="OpenWiFi">

@@ -3,7 +3,9 @@ package me.jariz.openwifi;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -19,6 +21,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        this.setTheme(R.style.OpenWiFi_Wallpaper);
         setContentView(R.layout.activity_main);
 
         Global.wiFiScanner = scanner;
@@ -81,7 +84,7 @@ public class MainActivity extends Activity {
                     case WiFiScanner.STATE_TIMEOUT:
                         if(onoff != null) onoff.setClickable(true);
                         setStatusColor(android.R.color.holo_blue_bright, 100, 100);
-                        setStatusString("Waiting for scan");
+                        setStatusString("Scanning...");
                         CircularAnimationUtils.pulseKeep = false;
                         CircularAnimationUtils.fillProgressbar(scanner.Timeout, holo);
                         break;
@@ -116,6 +119,15 @@ public class MainActivity extends Activity {
         holo.invalidate();
         this.onMs = onMs;
         this.offMs = offMs;
+
+        switch(res) {
+            case android.R.color.darker_gray:
+            case R.color.holo_yellow_light:
+                return;
+            default:
+                break;
+        }
+
         updateNotification();
     }
 
@@ -133,6 +145,18 @@ public class MainActivity extends Activity {
         builder.setContentText(statusString);
         builder.setLights(statusColor, onMs, offMs);
         builder.setOngoing(true);
+        Intent resultIntent = new Intent(this, MainActivity.class);
+
+        // Because clicking the notification opens a new ("special") activity, there's
+        // no need to create an artificial back stack.
+                PendingIntent resultPendingIntent =
+                        PendingIntent.getActivity(
+                                this.getApplicationContext(),
+                                0,
+                                resultIntent,
+                                PendingIntent.FLAG_UPDATE_CURRENT
+                        );
+        builder.setContentIntent(resultPendingIntent);
         builder.setTicker("OpenWiFi - " + statusString);
 
         //special circumstances

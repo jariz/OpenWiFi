@@ -20,7 +20,11 @@ public class CircularAnimationUtils {
 
     public static void fillProgressbar(final long duration, final HoloCircularProgressBar holo) {
         if (progressBarAnimator != null) {
-            progressBarAnimator.end();
+            if(progressBarAnimator.isRunning()) {
+                progressBarAnimator.end();
+                progressBarAnimator.cancel();
+            }
+
 
         }
         progressBarAnimator = ObjectAnimator.ofFloat(holo, "progress", 1f);
@@ -28,6 +32,7 @@ public class CircularAnimationUtils {
 
             @Override
             public void onAnimationCancel(final Animator animation) {
+                holo.setProgress(1f);
             }
 
             @Override
