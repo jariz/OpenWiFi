@@ -110,13 +110,16 @@ public class MainActivity extends Activity {
         soundSwitch.setChecked(sharedPreferences.getBoolean("sound", true));
 
         Switch networkSwitch = (Switch)findViewById(R.id.network);
+        networkSwitch.setChecked(sharedPreferences.getBoolean("network", false));
         networkSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
                 sharedPreferences.edit().putBoolean("network", b).commit();
+                if(Global.State != WiFiScanner.STATE_DESTROYED) {
+                    Switch(false); Switch(true);
+                }
             }
         });
-        networkSwitch.setChecked(sharedPreferences.getBoolean("network", false));
 
         // enable ActionBar app icon to behave as action to toggle nav drawer
         getActionBar().setDisplayHomeAsUpEnabled(true);
@@ -189,16 +192,18 @@ public class MainActivity extends Activity {
                     case WiFiScanner.STATE_CONNECTED:
                         if (onoff != null) onoff.setEnabled(true);
                         CircularAnimationUtils.pulseKeep = true;
-                        CircularAnimationUtils.pulse(holo, 1000);
+                        CircularAnimationUtils.pulseDuration = 1000;
+                        CircularAnimationUtils.pulse(holo);
                         setStatusColor(android.R.color.holo_green_light, 1000, 1000);
                         setStatusString("You are connected to '" + scanner.getCurrentSSID() + "'");
                         break;
                     case WiFiScanner.STATE_CONNECTING:
                         if (onoff != null) onoff.setEnabled(true);
                         CircularAnimationUtils.pulseKeep = true;
-                        CircularAnimationUtils.pulse(holo, 300);
+                        CircularAnimationUtils.pulseDuration = 300;
+                        CircularAnimationUtils.pulse(holo);
                         setStatusColor(R.color.holo_yellow_light, 300, 300);
-                        setStatusString("Connecting/Waiting for network from '" + scanner.getCurrentSSID() + "'....");
+                        setStatusString("Connecting to '" + scanner.getCurrentSSID() + "'....");
                         break;
                     case WiFiScanner.STATE_DISABLING:
                         if (onoff != null) onoff.setEnabled(false);
@@ -234,6 +239,13 @@ public class MainActivity extends Activity {
                         CircularAnimationUtils.pulseKeep = false;
                         CircularAnimationUtils.fillProgressbar(Global.Timeout, holo);
                         break;
+                    case WiFiScanner.STATE_TESTING:
+                        if (onoff != null) onoff.setEnabled(true);
+                        setStatusColor(android.R.color.holo_orange_light, 200, 100);
+                        setStatusString("Testing internet availability....");
+                        CircularAnimationUtils.pulseKeep = true;
+                        CircularAnimationUtils.pulseDuration = 200;
+                        CircularAnimationUtils.pulse(holo);
                 }
                 break;
         }

@@ -64,8 +64,9 @@ public class CircularAnimationUtils {
     static boolean pulseDirection = true;
     static boolean pulseKeep = false;
     static boolean pulseRunning = false;
+    static int pulseDuration = 0;
 
-    public static void pulse(final HoloCircularProgressBar holo, final long duration) {
+    public static void pulse(final HoloCircularProgressBar holo) {
         if(pulseRunning) {
             Log.i(TAG, "Tried to start a pulse while there already is one running");
             return;
@@ -74,7 +75,7 @@ public class CircularAnimationUtils {
         pulseInternal(holo, pulseDirection, new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animator) {
-                newPulse(holo,duration);
+                newPulse(holo);
             }
 
             @Override
@@ -91,10 +92,10 @@ public class CircularAnimationUtils {
             public void onAnimationRepeat(Animator animator) {
 
             }
-        }, duration);
+        });
     }
 
-    static void newPulse(final HoloCircularProgressBar holo, final long duration) {
+    static void newPulse(final HoloCircularProgressBar holo) {
         if(CircularAnimationUtils.pulseKeep) {
             pulseInternal(holo, CircularAnimationUtils.pulseDirection, new Animator.AnimatorListener() {
                 @Override
@@ -104,7 +105,7 @@ public class CircularAnimationUtils {
 
                 @Override
                 public void onAnimationEnd(Animator animator) {
-                    newPulse(holo,duration);
+                    newPulse(holo);
                 }
 
                 @Override
@@ -116,7 +117,7 @@ public class CircularAnimationUtils {
                 public void onAnimationRepeat(Animator animator) {
 
                 }
-            }, duration);
+            });
             pulseDirection = !pulseDirection;
         } else {
             
@@ -125,7 +126,7 @@ public class CircularAnimationUtils {
     }
 
     static ObjectAnimator pulseAnimator;
-    private static void pulseInternal(final HoloCircularProgressBar holo, final boolean direction, final Animator.AnimatorListener listener, final long duration) {
+    private static void pulseInternal(final HoloCircularProgressBar holo, final boolean direction, final Animator.AnimatorListener listener) {
         if(pulseAnimator != null) {
             pulseAnimator.cancel();
         }
@@ -156,7 +157,7 @@ public class CircularAnimationUtils {
         });
 
         pulseAnimator.addListener(listener);
-        pulseAnimator.setDuration(duration);
+        pulseAnimator.setDuration(pulseDuration);
         pulseAnimator.reverse();
 
         pulseAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {

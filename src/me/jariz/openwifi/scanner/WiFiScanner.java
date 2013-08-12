@@ -90,7 +90,7 @@ public class WiFiScanner {
     /**
      * OpenWiFi is testing the connection
      */
-    public static final int STATE_TESTING = 6;
+    public static final int STATE_TESTING = 7;
 
     /**
      * The State property changed.
@@ -148,11 +148,14 @@ public class WiFiScanner {
                             case ASSOCIATING:
                             case AUTHENTICATING:
                             case FOUR_WAY_HANDSHAKE:
+                            case ASSOCIATED:
                                 Global.State = STATE_CONNECTING;
                                 break;
                             case COMPLETED:
-                            case ASSOCIATED:
-                                testNetwork();
+                                if(sharedPreferences.getBoolean("network", false) && Global.State != STATE_CONNECTED) {
+                                    //change state to testing, scanservice will do the actual testing
+                                    Global.State = STATE_TESTING;
+                                } else Global.State = STATE_CONNECTED;
                                 break;
                             case INTERFACE_DISABLED:
                             case INVALID:
@@ -171,7 +174,7 @@ public class WiFiScanner {
         };
         IntentFilter filter = new IntentFilter(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
-        filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+        //filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         parent.registerReceiver(wifiStatusReceiver, filter);
 
         wifiScanReceiver = new BroadcastReceiver() {
@@ -180,6 +183,7 @@ public class WiFiScanner {
                 switch (Global.State) {
                     case WiFiScanner.STATE_CONNECTED:
                     case WiFiScanner.STATE_CONNECTING:
+                    case WiFiScanner.STATE_TESTING:
                         Log.i(TAG, "wifiScanReceiver: Ignoring scan results because connection's busy.");
                         return;
                 }
@@ -246,38 +250,11 @@ public class WiFiScanner {
 
     /* PRIVATE FUNCTIONS */
 
-    void testNetwork(int normalState) {
-        if(sharedPreferences.getBoolean("network", false)) {
-            //check if there's a network, if not, change state to connecting
-            
-        } else Global.State = normalState;
-    }
-
-    void readStream(InputStream in) {
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(in));
-            String line = "";
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
     /**
      * Function that will pick out the right networks and connect to them
      */
     void processWiFis(List<ScanResult> results) {
+        WifiInfo info = wifiManager.getConnectionInfo();
         for (ScanResult result : results) {
             if (getScanResultSecurity(result).equals(OPEN)) {
 
@@ -296,6 +273,10 @@ public class WiFiScanner {
                 while (configurationIterator.hasNext()) {
                     WifiConfiguration configuration = configurationIterator.next();
                     if (wc.BSSID.equals(configuration.BSSID)) {
+
+                        //it does match what we're looking for, but we're already connected to it....
+                        if(info != null && configuration.BSSID.equals(info.getBSSID())) return;
+
                         //match! update & enable
                         wc.networkId = configuration.networkId;
                         int id = wifiManager.updateNetwork(wc);
