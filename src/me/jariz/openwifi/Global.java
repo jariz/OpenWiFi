@@ -12,10 +12,11 @@ import me.jariz.openwifi.scanner.WiFiScanner;
  */
 
 /**
- * Static versions of WiFiScanner and MainActivity so ScanService can access them
+ * Global openwifi objects accessible from anywhere
  */
 public class Global {
     public static MainActivity mainActivity;
-    public static WiFiScanner wiFiScanner;
+    public static int State = -1;
+    public static int Timeout = 10000;
     public static WifiManager wifiManager;
 }

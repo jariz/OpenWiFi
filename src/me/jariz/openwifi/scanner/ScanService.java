@@ -1,6 +1,8 @@
 package me.jariz.openwifi.scanner;
 
+import android.app.AlarmManager;
 import android.app.IntentService;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
@@ -31,24 +33,39 @@ public class ScanService extends IntentService {
         context = this.getApplicationContext();
         Log.i(TAG, "HELLOWORLD from ScanService, " + intent.toString() + " " + context.toString());
 
-        switch (Global.wiFiScanner.State) {
-            case WiFiScanner.STATE_SCANNING:
-            case WiFiScanner.STATE_TIMEOUT:
-                Global.wiFiScanner.State = WiFiScanner.STATE_TIMEOUT;
-                Global.mainActivity.runOnUiThread(new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Global.mainActivity.interfaceCallback(WiFiScanner.CALLBACK_STATE_CHANGED);
+        if (Global.wifiManager == null || Global.State == WiFiScanner.STATE_DESTROYED) {
+            Log.w(TAG, "Application has vanished, service still running, attempting to unschedule me from alarm...");
+            AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            Intent scanService = new Intent(getApplicationContext(), ScanService.class);
+            PendingIntent pendingIntent = PendingIntent.getService(getApplicationContext(), 1337, scanService, 0);
+            manager.cancel(pendingIntent);
+            stopSelf();
+            return;
+        }
+
+
+        try {
+            switch (Global.State) {
+                case WiFiScanner.STATE_SCANNING:
+                case WiFiScanner.STATE_TIMEOUT:
+                    Global.State = WiFiScanner.STATE_TIMEOUT;
+                    Global.mainActivity.runOnUiThread(new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Global.mainActivity.interfaceCallback(WiFiScanner.CALLBACK_STATE_CHANGED);
+                        }
+                    }));
+
+                    try {
+                        Thread.sleep(Global.Timeout);
+                    } catch (InterruptedException e) {
                     }
-                }));
 
-                try {
-                    Thread.sleep(Global.wiFiScanner.Timeout);
-                } catch (InterruptedException e) {
-                }
-
-                Global.wifiManager.startScan();
-                break;
+                    Global.wifiManager.startScan();
+                    break;
+            }
+        } catch (Exception z) {
+            Log.e(TAG, z.toString());
         }
     }
 }

@@ -10,15 +10,20 @@ package me.jariz.openwifi.scanner;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.net.wifi.*;
+import android.content.*;
+import android.net.ConnectivityManager;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.util.Log;
 import me.jariz.openwifi.Global;
 import me.jariz.openwifi.MainActivity;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Iterator;
 import java.util.List;
 
@@ -31,16 +36,12 @@ public class WiFiScanner {
     /* PRIVATE VARS */
     WifiManager wifiManager;
     AlarmManager alarmManager;
+    ConnectivityManager connectivityManager;
     String TAG = "OW_WIFISCANNER";
     BroadcastReceiver wifiStatusReceiver;
     BroadcastReceiver wifiScanReceiver;
     MainActivity parent;
-
-    /* PUBLIC VARS */
-    public boolean Enabled = false;
-    public int State = 1;
-    public String Status = "";
-    public int Timeout = 10000;
+    SharedPreferences sharedPreferences;
 
     /* - CONSTANTS */
 
@@ -87,6 +88,11 @@ public class WiFiScanner {
     public static final int STATE_DISABLING = 6;
 
     /**
+     * OpenWiFi is testing the connection
+     */
+    public static final int STATE_TESTING = 6;
+
+    /**
      * The State property changed.
      */
     public static final int CALLBACK_STATE_CHANGED = 1;
@@ -94,11 +100,13 @@ public class WiFiScanner {
     /* PUBLIC FUNCTIONS */
     public void Init(final MainActivity parent) {
         this.parent = parent;
+        sharedPreferences = parent.getSharedPreferences("OpenWiFi", 0);
         alarmManager = (AlarmManager) parent.getSystemService(Context.ALARM_SERVICE);
         wifiManager = (WifiManager) parent.getSystemService(Context.WIFI_SERVICE);
+        connectivityManager = (ConnectivityManager)parent.getSystemService(Context.CONNECTIVITY_SERVICE);
         Global.wifiManager = wifiManager;
 
-        if(State == STATE_DESTROYED) State = STATE_SCANNING; //placeholder state while we're initing
+        if (Global.State == STATE_DESTROYED) Global.State = STATE_SCANNING; //placeholder state while we're initing
 
         Log.i(TAG, "####################");
         Log.i(TAG, "# WifiScanner init #");
@@ -108,67 +116,68 @@ public class WiFiScanner {
         wifiStatusReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                int oldState = State;
+                int oldState = Global.State;
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();
 
-                Log.i(TAG, "wifiStatusReceiver: Received signal from "+context.toString()+" w/"+(intent == null ? "UNKNOWN" : intent.toString()));
+                Log.i(TAG, "wifiStatusReceiver: Received signal from " + context.toString() + " w/" + (intent == null ? "UNKNOWN" : intent.toString()));
 
-                if(State == STATE_DESTROYED) {
+                if (Global.State == STATE_DESTROYED) {
                     Log.i(TAG, "wifiStatusReceiver: WifiScanner is destroyed, ignoring state change, sending callback to mainactivity");
                     parent.interfaceCallback(CALLBACK_STATE_CHANGED);
                     return;
                 }
 
-                switch(wifiManager.getWifiState()) {
+                switch (wifiManager.getWifiState()) {
                     case WifiManager.WIFI_STATE_ENABLING:
-                        State = STATE_ENABLING;
+                        Global.State = STATE_ENABLING;
                         break;
                     case WifiManager.WIFI_STATE_DISABLING:
                     case WifiManager.WIFI_STATE_UNKNOWN:
-                        State = STATE_DISABLING;
+                        Global.State = STATE_DISABLING;
                         break;
                     case WifiManager.WIFI_STATE_DISABLED:
-                        State = STATE_DISABLED;
+                        Global.State = STATE_DISABLED;
                         break;
                     case WifiManager.WIFI_STATE_ENABLED:
                         switch (wifiInfo.getSupplicantState()) {
                             case INACTIVE:
                             case SCANNING:
                             case DISCONNECTED:
-                                State = STATE_SCANNING;
+                                Global.State = STATE_SCANNING;
                                 break;
                             case ASSOCIATING:
                             case AUTHENTICATING:
                             case FOUR_WAY_HANDSHAKE:
-                                State = STATE_CONNECTING;
+                                Global.State = STATE_CONNECTING;
                                 break;
                             case COMPLETED:
                             case ASSOCIATED:
-                                State = STATE_CONNECTED;
+                                testNetwork();
                                 break;
                             case INTERFACE_DISABLED:
                             case INVALID:
                             case UNINITIALIZED:
-                                State = STATE_DISABLED;
+                                Global.State = STATE_DISABLED;
                                 break;
                         }
                         break;
                 }
 
-                if(oldState != State) {
-                    Log.i(TAG, "State changed from "+oldState+" to "+State);
+                if (oldState != Global.State) {
+                    Log.i(TAG, "State changed from " + oldState + " to " + Global.State);
                     parent.interfaceCallback(CALLBACK_STATE_CHANGED);
                 }
             }
         };
         IntentFilter filter = new IntentFilter(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         parent.registerReceiver(wifiStatusReceiver, filter);
 
         wifiScanReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                switch(State) {
+                switch (Global.State) {
                     case WiFiScanner.STATE_CONNECTED:
                     case WiFiScanner.STATE_CONNECTING:
                         Log.i(TAG, "wifiScanReceiver: Ignoring scan results because connection's busy.");
@@ -181,19 +190,20 @@ public class WiFiScanner {
         parent.registerReceiver(wifiScanReceiver, filter);
 
         Log.i(TAG, "- Starting service...");
-        Intent scanService = new Intent(this.parent, ScanService.class);
-        PendingIntent pendingIntent = PendingIntent.getService(this.parent, 1337, scanService, 0);
+        Intent scanService = new Intent(parent.getApplicationContext(), ScanService.class);
+        PendingIntent pendingIntent = PendingIntent.getService(parent.getApplicationContext(), 1337, scanService, 0);
         try {
             //cancel service if already running
             alarmManager.cancel(pendingIntent);
             Log.i(TAG, "        - Killed service that was already running!");
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
-        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis()+Timeout, Timeout, pendingIntent);
+        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + Global.Timeout, Global.Timeout, pendingIntent);
         parent.startService(scanService);
 
         Log.i(TAG, "- Checking if WiFi is disabled and if so, enabling it...");
-        if(wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED) {
+        if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED) {
             wifiManager.setWifiEnabled(true);
             Log.i(TAG, "        - WiFi not enabled, enabling...");
         } else {
@@ -202,13 +212,19 @@ public class WiFiScanner {
     }
 
     public void Destroy() {
+        if (parent == null) return;
+
         Log.i(TAG, "#######################");
         Log.i(TAG, "# WifiScanner destroy #");
         Log.i(TAG, "#######################");
 
         Log.i(TAG, "- Unregistering receivers...");
-        parent.unregisterReceiver(wifiStatusReceiver);
-        parent.unregisterReceiver(wifiScanReceiver);
+        try {
+            parent.unregisterReceiver(wifiStatusReceiver);
+            parent.unregisterReceiver(wifiScanReceiver);
+        } catch (IllegalArgumentException z) {
+            Log.w(TAG, "Tried to unregister a receiver that wasn't registered: "+z.getMessage());
+        }
 
         Log.i(TAG, "- Killing service...");
         Intent scanService = new Intent(parent, ScanService.class);
@@ -220,7 +236,7 @@ public class WiFiScanner {
             Log.e(TAG, "    - Unable to kill service(?)");
         }
 
-        State = STATE_DESTROYED;
+        Global.State = STATE_DESTROYED;
         wifiStatusReceiver.onReceive(parent, null);
     }
 
@@ -229,6 +245,34 @@ public class WiFiScanner {
     }
 
     /* PRIVATE FUNCTIONS */
+
+    void testNetwork(int normalState) {
+        if(sharedPreferences.getBoolean("network", false)) {
+            //check if there's a network, if not, change state to connecting
+            
+        } else Global.State = normalState;
+    }
+
+    void readStream(InputStream in) {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(in));
+            String line = "";
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
     /**
      * Function that will pick out the right networks and connect to them
@@ -251,7 +295,7 @@ public class WiFiScanner {
                 boolean found = false;
                 while (configurationIterator.hasNext()) {
                     WifiConfiguration configuration = configurationIterator.next();
-                    if (wc.SSID.equals(configuration.SSID)) {
+                    if (wc.BSSID.equals(configuration.BSSID)) {
                         //match! update & enable
                         wc.networkId = configuration.networkId;
                         int id = wifiManager.updateNetwork(wc);
@@ -272,7 +316,6 @@ public class WiFiScanner {
 
                 wifiManager.saveConfiguration();
                 wifiManager.reconnect();
-                wifiManager.reassociate();
             }
         }
     }
@@ -282,9 +325,11 @@ public class WiFiScanner {
     public static final String WEP = "WEP";
     public static final String EAP = "EAP";
     public static final String OPEN = "Open";
+    public static final String ADHOC = "IBSS";
+
     public static String getScanResultSecurity(ScanResult scanResult) {
         final String cap = scanResult.capabilities;
-        final String[] securityModes = { WEP, PSK, EAP };
+        final String[] securityModes = {WEP, PSK, EAP, ADHOC};
         for (int i = securityModes.length - 1; i >= 0; i--) {
             if (cap.contains(securityModes[i])) {
                 return securityModes[i];
