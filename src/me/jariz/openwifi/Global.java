@@ -19,4 +19,5 @@ public class Global {
     public static int State = -1;
     public static int Timeout = 10000;
     public static WifiManager wifiManager;
+    public static boolean TestRunning = false;
 }

@@ -36,7 +36,6 @@ public class WiFiScanner {
     /* PRIVATE VARS */
     WifiManager wifiManager;
     AlarmManager alarmManager;
-    ConnectivityManager connectivityManager;
     String TAG = "OW_WIFISCANNER";
     BroadcastReceiver wifiStatusReceiver;
     BroadcastReceiver wifiScanReceiver;
@@ -103,7 +102,6 @@ public class WiFiScanner {
         sharedPreferences = parent.getSharedPreferences("OpenWiFi", 0);
         alarmManager = (AlarmManager) parent.getSystemService(Context.ALARM_SERVICE);
         wifiManager = (WifiManager) parent.getSystemService(Context.WIFI_SERVICE);
-        connectivityManager = (ConnectivityManager)parent.getSystemService(Context.CONNECTIVITY_SERVICE);
         Global.wifiManager = wifiManager;
 
         if (Global.State == STATE_DESTROYED) Global.State = STATE_SCANNING; //placeholder state while we're initing
@@ -119,12 +117,19 @@ public class WiFiScanner {
                 int oldState = Global.State;
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();
 
-                Log.i(TAG, "wifiStatusReceiver: Received signal from " + context.toString() + " w/" + (intent == null ? "UNKNOWN" : intent.toString()));
+                Log.i(TAG, "wifiStatusReceiver: Received " + (intent == null ? "UNKNOWN" : intent.toString()));
 
+                //exceptions
                 if (Global.State == STATE_DESTROYED) {
                     Log.i(TAG, "wifiStatusReceiver: WifiScanner is destroyed, ignoring state change, sending callback to mainactivity");
                     parent.interfaceCallback(CALLBACK_STATE_CHANGED);
                     return;
+                }
+
+                if(intent != null && Global.State == STATE_TESTING && intent.getAction().equals("android.net.conn.CONNECTIVITY_CHANGE")) {
+                    //special circumstance where we're gonna manually launch the service because it skipped it's round because the current network isn't wifi.
+                    Log.i(TAG, "wifiStatusReceiver: Connectivity change while testing, calling service manually without alarm.");
+                    parent.startService(new Intent(parent.getApplicationContext(), ScanService.class));
                 }
 
                 switch (wifiManager.getWifiState()) {
@@ -167,14 +172,14 @@ public class WiFiScanner {
                 }
 
                 if (oldState != Global.State) {
-                    Log.i(TAG, "State changed from " + oldState + " to " + Global.State);
+                    Log.i(TAG, "wifiStatusReceiver: State changed from " + oldState + " to " + Global.State);
                     parent.interfaceCallback(CALLBACK_STATE_CHANGED);
                 }
             }
         };
         IntentFilter filter = new IntentFilter(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
-        //filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+        filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         parent.registerReceiver(wifiStatusReceiver, filter);
 
         wifiScanReceiver = new BroadcastReceiver() {
@@ -257,6 +262,12 @@ public class WiFiScanner {
         WifiInfo info = wifiManager.getConnectionInfo();
         for (ScanResult result : results) {
             if (getScanResultSecurity(result).equals(OPEN)) {
+
+                if(result.SSID.equals("0x") || result.SSID == null || result.SSID.equals("<unknown ssid>")) {
+                    // https://code.google.com/p/android/issues/detail?id=43336
+                    Log.w(TAG, "[ANDROID BUG] Tried to connect to a unknown/null SSID, aborted!");
+                    continue;
+                }
 
                 WifiConfiguration wc = new WifiConfiguration();
                 wc.BSSID = result.BSSID;

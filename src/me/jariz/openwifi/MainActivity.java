@@ -12,6 +12,7 @@ import android.media.RingtoneManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.support.v4.app.ActionBarDrawerToggle;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.util.Log;
 import android.view.Menu;
@@ -38,9 +39,11 @@ public class MainActivity extends Activity {
                 break;
             case 2:
                 setTheme(R.style.OpenWiFi_Light_Dark);
+                getActionBar().setIcon(R.drawable.ic_launcher_white);
                 break;
             case 3:
                 setTheme(R.style.OpenWiFi_Light);
+                getActionBar().setIcon(R.drawable.ic_launcher_white);
                 break;
         }
 
@@ -62,11 +65,7 @@ public class MainActivity extends Activity {
                 sharedPreferences.edit().putInt("timeout", i).commit();
                 changeTimeout(i);
             }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> adapterView) {
-
-            }
+            @Override public void onNothingSelected(AdapterView<?> adapterView) {}
         });
         timeoutSpinner.setSelection(timeout);
 
@@ -84,11 +83,7 @@ public class MainActivity extends Activity {
                     overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
                 }
             }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> adapterView) {
-
-            }
+            @Override public void onNothingSelected(AdapterView<?> adapterView) {}
         });
 
         Switch vibrateSwitch = (Switch)findViewById(R.id.vibration);
@@ -173,6 +168,14 @@ public class MainActivity extends Activity {
         super.onPostCreate(savedInstanceState);
         // Sync the toggle state after onRestoreInstanceState has occurred.
         drawerToggle.syncState();
+    }
+
+    @Override
+    protected void onNewIntent (Intent intent) {
+        super.onNewIntent(intent);
+        if(intent.getBooleanExtra("me.jariz.openwifi.disable", false))
+            if(Global.State != WiFiScanner.STATE_DESTROYED)
+                onoff.setChecked(false);
     }
 
     @Override
@@ -296,18 +299,46 @@ public class MainActivity extends Activity {
         updateNotification();
     }
 
+    boolean foreground = false;
+    boolean justPaused = false;
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        foreground = false;
+        justPaused = true;
+        updateNotification();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        foreground = true;
+        updateNotification();
+    }
+
     void updateNotification() {
-        Notification.Builder builder = new Notification.Builder(getApplicationContext());
-        builder.setSmallIcon(R.drawable.openwifi_notification);
-        builder.setContentTitle("OpenWiFi");
-        builder.setContentText(statusString);
-        builder.setLights(statusColor, onMs, offMs);
-        builder.setOngoing(true);
+        if(foreground) {
+            notificationManager.cancel(0xDEADBEEF);
+            return;
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext())
+        .setSmallIcon(R.drawable.openwifi_notification)
+        .setContentTitle("OpenWiFi")
+        .setContentText(statusString)
+        .setLights(statusColor, onMs, offMs)
+        .setOngoing(true);
+        if(!justPaused) builder.setTicker(statusString);
+
+        Intent turnOffIntent  = new Intent(this, MainActivity.class);
+        turnOffIntent.putExtra("me.jariz.openwifi.disable", true);
+        PendingIntent turnOffPendingIntent = PendingIntent.getActivity(this.getApplicationContext(), 0xDEADDEAD, turnOffIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Disable OpenWiFi", turnOffPendingIntent);
 
         Intent resultIntent = new Intent(this, MainActivity.class);
         PendingIntent resultPendingIntent = PendingIntent.getActivity(this.getApplicationContext(), 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
         builder.setContentIntent(resultPendingIntent);
-        builder.setTicker("OpenWiFi - " + statusString);
 
         //special circumstances
         switch (Global.State) {
@@ -315,6 +346,8 @@ public class MainActivity extends Activity {
                 notificationManager.cancel(0xDEADBEEF);
                 return;
             case WiFiScanner.STATE_CONNECTED:
+                if(justPaused) break;
+
                 if(sharedPreferences.getBoolean("sound", true)) {
                     RingtoneManager ringtoneManager = new RingtoneManager(this);
                     builder.setSound(ringtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION));
@@ -328,6 +361,7 @@ public class MainActivity extends Activity {
                 builder.setProgress(0, 0, true);
                 break;
         }
+        justPaused = false;
         notificationManager.notify(0xDEADBEEF, builder.build());
     }
 

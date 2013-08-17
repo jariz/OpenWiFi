@@ -5,6 +5,8 @@ import android.app.IntentService;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.util.Log;
 import me.jariz.openwifi.Global;
 
@@ -35,11 +37,13 @@ public class ScanService extends IntentService {
 
     String TAG = "OW_SCANSERVICE";
     Context context;
+    ConnectivityManager connectivityManager;
 
     @Override
     protected void onHandleIntent(Intent intent) {
         context = this.getApplicationContext();
-        Log.i(TAG, "HELLOWORLD from ScanService, " + intent.toString() + " " + context.toString());
+        connectivityManager = (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        Log.i(TAG, "HELLOWORLD from ScanService, " + intent.toString());
 
         if (Global.wifiManager == null || Global.State == WiFiScanner.STATE_DESTROYED) {
             Log.w(TAG, "Application has vanished, service still running, attempting to unschedule me from alarm...");
@@ -59,18 +63,36 @@ public class ScanService extends IntentService {
                      * @see http://www.chromium.org/chromium-os/chromiumos-design-docs/network-portal-detection
                      */
 
+                    //another instance of this service is already running a request
+                    if(Global.TestRunning) return;
+
+                    //check for active connection to make sure we're testing trough wifi
+                    NetworkInfo info = connectivityManager.getActiveNetworkInfo();
+                    if(info != null && info.getType() != ConnectivityManager.TYPE_WIFI) {
+                        Log.i(TAG, "Woops, can't run test if we're not connected to wifi yet! Waiting for WiFiScanner to call me when the connectivity changes....");
+                        break;
+                    }
+
                     int rand = new Random().nextInt(6);
                     URL url = new URL("http://clients"+ (rand == 0 ? 1 : rand) +".google.com/generate_204");
-                    Log.i(TAG, "Testing internet connection trough url "+url.toString());
+                    Log.i(TAG, "Testing for portals trough url "+url.toString());
 
+                    Global.TestRunning = true;
                     try {
                         HttpURLConnection con = (HttpURLConnection) url.openConnection();
-                        if(con.getResponseCode() == 204) Global.State = WiFiScanner.STATE_CONNECTED;
-                        else Global.State = WiFiScanner.STATE_TIMEOUT;
+                        if(con.getResponseCode() == 204) {
+                            Log.i(TAG, "Portal detection success, no portals found, changing state to connected!");
+                            Global.State = WiFiScanner.STATE_CONNECTED;
+                        }
+                        else {
+                            Log.i(TAG, "Portal detection success, PORTAL FOUND, changing state to timeout.");
+                            Global.State = WiFiScanner.STATE_TIMEOUT;
+                        }
                     } catch(Exception z) {
-                        Log.w(TAG, z.getMessage());
+                        Log.i(TAG, "Portal detection failed, "+z.getMessage());
                         Global.State = WiFiScanner.STATE_TIMEOUT;
                     }
+                    Global.TestRunning = false;
                     Global.mainActivity.runOnUiThread(new Thread(new Runnable() {
                         @Override
                         public void run() {
@@ -98,30 +120,6 @@ public class ScanService extends IntentService {
             }
         } catch (Exception z) {
             Log.e(TAG, z.toString());
-        }
-    }
-
-
-    String readStream(InputStream in) {
-        BufferedReader reader = null;
-        StringBuilder sb = new StringBuilder();
-        try {
-            reader = new BufferedReader(new InputStreamReader(in));
-            String line = "";
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            return sb.toString();
         }
     }
 }

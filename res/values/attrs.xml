@@ -5,4 +5,9 @@
         <attr name="drawerColor" format="color"></attr>
     </declare-styleable>
 
+    <declare-styleable name="Theme">
+        <attr name="sectionHeaderColor" format="color"></attr>
+        <attr name="sectionHeaderLine" format="reference"></attr>
+    </declare-styleable>
+
 </resources>
