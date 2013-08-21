@@ -130,7 +130,7 @@ public class WiFiScanner {
                     //special circumstance where we're gonna manually launch the service because it skipped it's round because the current network isn't wifi.
                     Log.i(TAG, "wifiStatusReceiver: Connectivity change while testing, calling service manually without alarm.");
                     parent.startService(new Intent(parent.getApplicationContext(), ScanService.class));
-                }
+                } else if(intent.getAction().equals("android.net.conn.CONNECTIVITY_CHANGE")) return;
 
                 switch (wifiManager.getWifiState()) {
                     case WifiManager.WIFI_STATE_ENABLING:
@@ -141,7 +141,12 @@ public class WiFiScanner {
                         Global.State = STATE_DISABLING;
                         break;
                     case WifiManager.WIFI_STATE_DISABLED:
-                        Global.State = STATE_DISABLED;
+                        if(oldState != STATE_ENABLING)
+                            Global.State = STATE_DISABLED;
+                        else {
+                            Global.State = STATE_ENABLING;
+                            parent.interfaceCallback(CALLBACK_STATE_CHANGED); //force gui callback
+                        }
                         break;
                     case WifiManager.WIFI_STATE_ENABLED:
                         switch (wifiInfo.getSupplicantState()) {
@@ -213,6 +218,7 @@ public class WiFiScanner {
 
         Log.i(TAG, "- Checking if WiFi is disabled and if so, enabling it...");
         if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED) {
+            Global.State = STATE_ENABLING; //manually set state because android doesn't directly change the state before next gui callback occurs
             wifiManager.setWifiEnabled(true);
             Log.i(TAG, "        - WiFi not enabled, enabling...");
         } else {
@@ -263,7 +269,7 @@ public class WiFiScanner {
         for (ScanResult result : results) {
             if (getScanResultSecurity(result).equals(OPEN)) {
 
-                if(result.SSID.equals("0x") || result.SSID == null || result.SSID.equals("<unknown ssid>")) {
+                if(result.SSID == null  || result.SSID.equals("0x")|| result.SSID.equals("<unknown ssid>")) {
                     // https://code.google.com/p/android/issues/detail?id=43336
                     Log.w(TAG, "[ANDROID BUG] Tried to connect to a unknown/null SSID, aborted!");
                     continue;

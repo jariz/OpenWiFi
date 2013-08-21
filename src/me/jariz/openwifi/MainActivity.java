@@ -193,62 +193,66 @@ public class MainActivity extends Activity {
                 //GUI
                 switch (Global.State) {
                     case WiFiScanner.STATE_CONNECTED:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         CircularAnimationUtils.pulseKeep = true;
                         CircularAnimationUtils.pulseDuration = 1000;
                         CircularAnimationUtils.pulse(holo);
                         setStatusColor(android.R.color.holo_green_light, 1000, 1000);
                         setStatusString("You are connected to '" + scanner.getCurrentSSID() + "'");
+                        CircularAnimationUtils.stopProgressBar();
                         break;
                     case WiFiScanner.STATE_CONNECTING:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         CircularAnimationUtils.pulseKeep = true;
                         CircularAnimationUtils.pulseDuration = 300;
                         CircularAnimationUtils.pulse(holo);
                         setStatusColor(R.color.holo_yellow_light, 300, 300);
                         setStatusString("Connecting to '" + scanner.getCurrentSSID() + "'....");
+                        CircularAnimationUtils.stopProgressBar();
                         break;
                     case WiFiScanner.STATE_DISABLING:
-                        if (onoff != null) onoff.setEnabled(false);
+                        if(onoff != null) onoff.setEnabled(false);
                         setStatusString("WiFi is disabling...");
                         break;
-                    case WiFiScanner.STATE_ENABLING:
-                        if (onoff != null) onoff.setEnabled(false);
-                        setStatusString("WiFi is enabling...");
-                        break;
                     case WiFiScanner.STATE_DISABLED:
-                        if (onoff != null) {
-                            onoff.setEnabled(false);
+                        if(onoff != null) {
+                            //this will call Switch(false) which will destroy the scanner and change the state to destroyed.
                             onoff.setChecked(false);
-                            //setting checked to false will result in scanner.Destroy, which will set STATE_DESTROYED
                         }
                         break;
+                    case WiFiScanner.STATE_ENABLING:
+                        if(onoff != null) onoff.setEnabled(false);
+                        setStatusString("WiFi is enabling...");
+                        break;
                     case WiFiScanner.STATE_DESTROYED:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         CircularAnimationUtils.pulseKeep = false;
                         setStatusColor(android.R.color.darker_gray, 10000, 0);
                         setStatusString("OpenWiFi is disabled.");
+                        CircularAnimationUtils.stopProgressBar();
                         break;
                     case WiFiScanner.STATE_SCANNING:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         setStatusString("Running scan...");
                         setStatusColor(android.R.color.holo_blue_dark, 100, 50);
                         CircularAnimationUtils.pulseKeep = false;
+                        CircularAnimationUtils.stopProgressBar();
                         break;
                     case WiFiScanner.STATE_TIMEOUT:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         setStatusColor(android.R.color.holo_blue_bright, 100, 100);
                         setStatusString("Scanning...");
                         CircularAnimationUtils.pulseKeep = false;
                         CircularAnimationUtils.fillProgressbar(Global.Timeout, holo);
                         break;
                     case WiFiScanner.STATE_TESTING:
-                        if (onoff != null) onoff.setEnabled(true);
+                        if(onoff != null) onoff.setEnabled(true);
                         setStatusColor(android.R.color.holo_orange_light, 200, 100);
                         setStatusString("Testing internet availability....");
                         CircularAnimationUtils.pulseKeep = true;
                         CircularAnimationUtils.pulseDuration = 200;
                         CircularAnimationUtils.pulse(holo);
+                        CircularAnimationUtils.stopProgressBar();
                 }
                 break;
         }
@@ -293,6 +297,7 @@ public class MainActivity extends Activity {
     }
 
     void setStatusString(String statusString) {
+        Log.i(TAG, "*** Status changed to '"+statusString+"' ***");
         this.statusString = statusString;
         TextView textView = (TextView) findViewById(R.id.textView);
         textView.setText(statusString);

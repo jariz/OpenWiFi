@@ -18,14 +18,19 @@ public class CircularAnimationUtils {
     static String TAG = "OW_ANIMATION";
     static ObjectAnimator progressBarAnimator;
 
+    public static void stopProgressBar() {
+        if (progressBarAnimator != null) {
+            if(progressBarAnimator.isRunning()) {
+                progressBarAnimator.cancel();
+            }
+        }
+    }
+
     public static void fillProgressbar(final long duration, final HoloCircularProgressBar holo) {
         if (progressBarAnimator != null) {
             if(progressBarAnimator.isRunning()) {
-                progressBarAnimator.end();
                 progressBarAnimator.cancel();
             }
-
-
         }
         progressBarAnimator = ObjectAnimator.ofFloat(holo, "progress", 1f);
         progressBarAnimator.addListener(new Animator.AnimatorListener() {
@@ -50,7 +55,7 @@ public class CircularAnimationUtils {
         });
 
         progressBarAnimator.setDuration(duration);
-        progressBarAnimator.reverse();
+        //progressBarAnimator.reverse();
         progressBarAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
 
             @Override
